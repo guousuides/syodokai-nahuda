@@ -25,7 +25,11 @@ def create_pdf(data, img_path, save_path):
             mod = (idx % 10) + 1
             name = str(row["名前"])
             year = str(row["学部学年"])
-            pos = str(row["役職"]) if not pd.isnull(row["役職"]) else ''
+            pos = str(row["役職"]) if "役職" in row and not pd.isnull(row["役職"]) else ''
+            
+            furigana = ""
+            if "フリガナ" in row and not pd.isnull(row["フリガナ"]):
+                furigana = str(row["フリガナ"])
 
             base_x = 57.5*mm if mod % 2 == 1 else 57.5*mm+offset_x
             base_y = 260*mm + ((mod-1)//2)*offset_y
@@ -34,9 +38,15 @@ def create_pdf(data, img_path, save_path):
             year_y = 280*mm + ((mod-1)//2)*offset_y
             pos_y = 272.5*mm + ((mod-1)//2)*offset_y
 
+            furigana_y = base_y + 8*mm  # Slightly above the name
+
             if mod == 1:
                 page.drawImage(img_path, 0*mm, 0*mm, 210*mm, 297*mm)
             
+            if furigana:
+                page.setFont("HGRKK", 10)  # Smaller font for Furigana
+                page.drawCentredString(base_x, furigana_y, furigana)
+
             page.setFont("HGRKK", 26)
             page.drawCentredString(base_x, base_y, name)
             page.setFont("HGRKK", 13)
@@ -123,19 +133,24 @@ class ManualInputWindow:
         self.entry_name = tk.Entry(frame_input)
         self.entry_name.grid(row=0, column=1, padx=5)
 
-        tk.Label(frame_input, text="学部学年:").grid(row=1, column=0, padx=5)
+        tk.Label(frame_input, text="フリガナ:").grid(row=1, column=0, padx=5)
+        self.entry_furigana = tk.Entry(frame_input)
+        self.entry_furigana.grid(row=1, column=1, padx=5)
+
+        tk.Label(frame_input, text="学部学年:").grid(row=2, column=0, padx=5)
         self.entry_year = tk.Entry(frame_input)
-        self.entry_year.grid(row=1, column=1, padx=5)
+        self.entry_year.grid(row=2, column=1, padx=5)
 
-        tk.Label(frame_input, text="役職:").grid(row=2, column=0, padx=5)
+        tk.Label(frame_input, text="役職:").grid(row=3, column=0, padx=5)
         self.entry_pos = tk.Entry(frame_input)
-        self.entry_pos.grid(row=2, column=1, padx=5)
+        self.entry_pos.grid(row=3, column=1, padx=5)
 
-        tk.Button(frame_input, text="追加", command=self.add_entry).grid(row=3, column=0, columnspan=2, pady=10)
+        tk.Button(frame_input, text="追加", command=self.add_entry).grid(row=4, column=0, columnspan=2, pady=10)
 
         # リスト表示
-        self.tree = ttk.Treeview(self.window, columns=("Name", "Year", "Pos"), show="headings")
+        self.tree = ttk.Treeview(self.window, columns=("Name", "Furigana", "Year", "Pos"), show="headings")
         self.tree.heading("Name", text="名前")
+        self.tree.heading("Furigana", text="フリガナ")
         self.tree.heading("Year", text="学部学年")
         self.tree.heading("Pos", text="役職")
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -149,6 +164,7 @@ class ManualInputWindow:
 
     def add_entry(self):
         name = self.entry_name.get()
+        furigana = self.entry_furigana.get()
         year = self.entry_year.get()
         pos = self.entry_pos.get()
 
@@ -156,11 +172,12 @@ class ManualInputWindow:
              messagebox.showwarning("警告", "名前は必須です")
              return
 
-        self.data_list.append({"名前": name, "学部学年": year, "役職": pos})
-        self.tree.insert("", "end", values=(name, year, pos))
+        self.data_list.append({"名前": name, "フリガナ": furigana, "学部学年": year, "役職": pos})
+        self.tree.insert("", "end", values=(name, furigana, year, pos))
         
         # 入力欄クリア
         self.entry_name.delete(0, tk.END)
+        self.entry_furigana.delete(0, tk.END)
         self.entry_year.delete(0, tk.END)
         self.entry_pos.delete(0, tk.END)
         self.entry_name.focus_set()
@@ -211,4 +228,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- 
