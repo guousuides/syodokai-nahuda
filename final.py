@@ -8,7 +8,6 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import os
 
-
 def create_pdf(data, img_path, save_path):
     try:
         page = canvas.Canvas(save_path, pagesize=portrait(A4))
@@ -20,7 +19,7 @@ def create_pdf(data, img_path, save_path):
            pass # 既に登録されている場合など
 
         offset_x = 87.5 * mm
-        offset_y = -58* mm
+        offset_y = -59* mm
 
         for idx, row in data.iterrows():
             mod = (idx % 10) + 1
@@ -33,29 +32,13 @@ def create_pdf(data, img_path, save_path):
                 furigana = str(row["フリガナ"])
 
             base_x = 57.5*mm if mod % 2 == 1 else 57.5*mm+offset_x
-            
-            # Y座標の決定 logic
-            if "Y" in row and not pd.isnull(row["Y"]) and str(row["Y"]).strip() != "":
-                 try:
-                     # ユーザー指定のY座標を使用 (単位はmmと仮定)
-                     base_y = float(row["Y"]) * mm
-                 except ValueError:
-                     # 数値変換できない場合はデフォルト計算を使用
-                     base_y = 260*mm + ((mod-1)//2)*offset_y
-            else:
-                 # デフォルト計算
-                 base_y = 260*mm + ((mod-1)//2)*offset_y
-
+            base_y = 255*mm + ((mod-1)//2)*offset_y
             right_x = 90*mm if mod % 2 == 1 else 90*mm+offset_x
             string_x = 25*mm if mod % 2 == 1 else 25*mm+offset_x
-            
-            # 各要素のY座標はbase_yからの相対位置で決定 (デフォルト配置に基づく差分)
-            # year_y (280) - base_y (260) = +20
-            year_y = base_y + 20*mm
-            # pos_y (272.5) - base_y (260) = +12.5
-            pos_y = base_y + 12.5*mm
-            # furigana_y (base_y + 8)
-            furigana_y = base_y + 8*mm
+            year_y = 280*mm + ((mod-1)//2)*offset_y
+            pos_y = 272.5*mm + ((mod-1)//2)*offset_y
+
+            furigana_y = base_y + 8*mm  # Slightly above the name
 
             if mod == 1:
                 page.drawImage(img_path, 0*mm, 0*mm, 210*mm, 297*mm)
@@ -138,7 +121,7 @@ class ManualInputWindow:
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title("手動入力モード")
-        self.window.geometry("700x500") # 少し広げる
+        self.window.geometry("600x500")
         
         self.data_list = []
 
@@ -162,20 +145,14 @@ class ManualInputWindow:
         self.entry_pos = tk.Entry(frame_input)
         self.entry_pos.grid(row=3, column=1, padx=5)
 
-        tk.Label(frame_input, text="Y座標(mm):").grid(row=4, column=0, padx=5)
-        self.entry_y = tk.Entry(frame_input)
-        self.entry_y.grid(row=4, column=1, padx=5)
-
-        tk.Button(frame_input, text="追加", command=self.add_entry).grid(row=5, column=0, columnspan=2, pady=10)
+        tk.Button(frame_input, text="追加", command=self.add_entry).grid(row=4, column=0, columnspan=2, pady=10)
 
         # リスト表示
-        self.tree = ttk.Treeview(self.window, columns=("Name", "Furigana", "Year", "Pos", "Y"), show="headings")
+        self.tree = ttk.Treeview(self.window, columns=("Name", "Furigana", "Year", "Pos"), show="headings")
         self.tree.heading("Name", text="名前")
         self.tree.heading("Furigana", text="フリガナ")
         self.tree.heading("Year", text="学部学年")
         self.tree.heading("Pos", text="役職")
-        self.tree.heading("Y", text="Y座標")
-        self.tree.column("Y", width=50) # Y座標は狭くていい
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # アクションボタン
@@ -190,21 +167,19 @@ class ManualInputWindow:
         furigana = self.entry_furigana.get()
         year = self.entry_year.get()
         pos = self.entry_pos.get()
-        y_val = self.entry_y.get()
 
         if not name:
              messagebox.showwarning("警告", "名前は必須です")
              return
 
-        self.data_list.append({"名前": name, "フリガナ": furigana, "学部学年": year, "役職": pos, "Y": y_val})
-        self.tree.insert("", "end", values=(name, furigana, year, pos, y_val))
+        self.data_list.append({"名前": name, "フリガナ": furigana, "学部学年": year, "役職": pos})
+        self.tree.insert("", "end", values=(name, furigana, year, pos))
         
         # 入力欄クリア
         self.entry_name.delete(0, tk.END)
         self.entry_furigana.delete(0, tk.END)
         self.entry_year.delete(0, tk.END)
         self.entry_pos.delete(0, tk.END)
-        self.entry_y.delete(0, tk.END)
         self.entry_name.focus_set()
 
     def delete_entry(self):

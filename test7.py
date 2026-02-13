@@ -8,7 +8,6 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import os
 
-
 def create_pdf(data, img_path, save_path):
     try:
         page = canvas.Canvas(save_path, pagesize=portrait(A4))
@@ -20,42 +19,34 @@ def create_pdf(data, img_path, save_path):
            pass # 既に登録されている場合など
 
         offset_x = 87.5 * mm
-        offset_y = -58* mm
+        offset_y = -59* mm
+
+        # 2個目の役職の位置調整用変数 (base_y_2)
+        # ここを変更することで、2個目の役職のY座標の基準位置を調整できます
+        base_y_2_val = 270 * mm 
 
         for idx, row in data.iterrows():
             mod = (idx % 10) + 1
             name = str(row["名前"])
             year = str(row["学部学年"])
             pos = str(row["役職"]) if "役職" in row and not pd.isnull(row["役職"]) else ''
+            pos2 = str(row["役職2"]) if "役職2" in row and not pd.isnull(row["役職2"]) else ''
             
             furigana = ""
             if "フリガナ" in row and not pd.isnull(row["フリガナ"]):
                 furigana = str(row["フリガナ"])
 
             base_x = 57.5*mm if mod % 2 == 1 else 57.5*mm+offset_x
-            
-            # Y座標の決定 logic
-            if "Y" in row and not pd.isnull(row["Y"]) and str(row["Y"]).strip() != "":
-                 try:
-                     # ユーザー指定のY座標を使用 (単位はmmと仮定)
-                     base_y = float(row["Y"]) * mm
-                 except ValueError:
-                     # 数値変換できない場合はデフォルト計算を使用
-                     base_y = 260*mm + ((mod-1)//2)*offset_y
-            else:
-                 # デフォルト計算
-                 base_y = 260*mm + ((mod-1)//2)*offset_y
-
+            base_y = 255*mm + ((mod-1)//2)*offset_y
             right_x = 90*mm if mod % 2 == 1 else 90*mm+offset_x
             string_x = 25*mm if mod % 2 == 1 else 25*mm+offset_x
+            year_y = 280*mm + ((mod-1)//2)*offset_y
+            pos_y = 274*mm + ((mod-1)//2)*offset_y
             
-            # 各要素のY座標はbase_yからの相対位置で決定 (デフォルト配置に基づく差分)
-            # year_y (280) - base_y (260) = +20
-            year_y = base_y + 20*mm
-            # pos_y (272.5) - base_y (260) = +12.5
-            pos_y = base_y + 12.5*mm
-            # furigana_y (base_y + 8)
-            furigana_y = base_y + 8*mm
+            # 2個目の役職のY座標計算
+            pos_y_2 = base_y_2_val + ((mod-1)//2)*offset_y
+
+            furigana_y = base_y + 8*mm  # Slightly above the name
 
             if mod == 1:
                 page.drawImage(img_path, 0*mm, 0*mm, 210*mm, 297*mm)
@@ -68,8 +59,12 @@ def create_pdf(data, img_path, save_path):
             page.drawCentredString(base_x, base_y, name)
             page.setFont("HGRKK", 13)
             page.drawRightString(right_x, year_y, year)
-            page.setFont("HGRKK", 13)
+            page.setFont("HGRKK", 12)
             page.drawString(string_x, pos_y, pos)
+            
+            # 2個目の役職を描画
+            if pos2:
+                page.drawString(string_x, pos_y_2, pos2)
 
             if mod == 10 or idx == len(data) - 1:
                 page.showPage()
@@ -138,7 +133,7 @@ class ManualInputWindow:
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title("手動入力モード")
-        self.window.geometry("700x500") # 少し広げる
+        self.window.geometry("700x550") # 少し広げる (600x500 -> 700x550)
         
         self.data_list = []
 
@@ -162,20 +157,19 @@ class ManualInputWindow:
         self.entry_pos = tk.Entry(frame_input)
         self.entry_pos.grid(row=3, column=1, padx=5)
 
-        tk.Label(frame_input, text="Y座標(mm):").grid(row=4, column=0, padx=5)
-        self.entry_y = tk.Entry(frame_input)
-        self.entry_y.grid(row=4, column=1, padx=5)
+        tk.Label(frame_input, text="役職2:").grid(row=4, column=0, padx=5)
+        self.entry_pos2 = tk.Entry(frame_input)
+        self.entry_pos2.grid(row=4, column=1, padx=5)
 
         tk.Button(frame_input, text="追加", command=self.add_entry).grid(row=5, column=0, columnspan=2, pady=10)
 
         # リスト表示
-        self.tree = ttk.Treeview(self.window, columns=("Name", "Furigana", "Year", "Pos", "Y"), show="headings")
+        self.tree = ttk.Treeview(self.window, columns=("Name", "Furigana", "Year", "Pos", "Pos2"), show="headings")
         self.tree.heading("Name", text="名前")
         self.tree.heading("Furigana", text="フリガナ")
         self.tree.heading("Year", text="学部学年")
         self.tree.heading("Pos", text="役職")
-        self.tree.heading("Y", text="Y座標")
-        self.tree.column("Y", width=50) # Y座標は狭くていい
+        self.tree.heading("Pos2", text="役職2")
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # アクションボタン
@@ -190,21 +184,21 @@ class ManualInputWindow:
         furigana = self.entry_furigana.get()
         year = self.entry_year.get()
         pos = self.entry_pos.get()
-        y_val = self.entry_y.get()
+        pos2 = self.entry_pos2.get()
 
         if not name:
              messagebox.showwarning("警告", "名前は必須です")
              return
 
-        self.data_list.append({"名前": name, "フリガナ": furigana, "学部学年": year, "役職": pos, "Y": y_val})
-        self.tree.insert("", "end", values=(name, furigana, year, pos, y_val))
+        self.data_list.append({"名前": name, "フリガナ": furigana, "学部学年": year, "役職": pos, "役職2": pos2})
+        self.tree.insert("", "end", values=(name, furigana, year, pos, pos2))
         
         # 入力欄クリア
         self.entry_name.delete(0, tk.END)
         self.entry_furigana.delete(0, tk.END)
         self.entry_year.delete(0, tk.END)
         self.entry_pos.delete(0, tk.END)
-        self.entry_y.delete(0, tk.END)
+        self.entry_pos2.delete(0, tk.END)
         self.entry_name.focus_set()
 
     def delete_entry(self):
